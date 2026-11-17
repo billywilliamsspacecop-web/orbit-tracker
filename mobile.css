@@ -1,0 +1,254 @@
+/* ==========================================================================
+   ORBITUS — mobile + square-screen layer
+   Loaded after style.css. Three targets:
+     1. Phones (portrait, ≤ 640px wide)       → stacked layout, bottom tab nav
+     2. Phones in landscape (short + touch)    → compact chrome, side-by-side
+     3. Square screens (≈1:1 aspect)           → stacked map, 2-col panels
+   `!important` is used only where resize.js writes inline sizes (sidebar
+   width, panel heights, dome height) that would otherwise pin the desktop
+   layout on a small screen.
+   ========================================================================== */
+
+:root {
+  --mnav-h: 58px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+/* Dynamic viewport units so mobile browser chrome doesn't clip the app */
+@supports (height: 100dvh) {
+  body, .app { height: 100dvh; }
+}
+
+/* Touch devices: no hover-only behaviour, bigger hit areas everywhere */
+@media (pointer: coarse) {
+  .nav-dropdown, .nav-item::after { display: none !important; }
+  .splitter, .panel-resize-handle, .launch-dome-resize-handle { display: none !important; }
+  .map-tool-btn, .view-toggle-btn, .dome-ctrl-btn, .replay-btn, .tab-btn, .subtab-btn, .media-tab {
+    min-height: 36px;
+  }
+  .leaflet-touch .leaflet-bar a { width: 36px; height: 36px; line-height: 36px; }
+  /* iOS zooms the page when focusing inputs under 16px */
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* ==========================================================================
+   1. PHONES — portrait
+   ========================================================================== */
+@media (max-width: 640px) {
+
+  /* ---- Intro + picker ---- */
+  .intro-content { padding: 0 22px; }
+  .intro-kicker { font-size: 10px; letter-spacing: 3px; }
+  .intro-title { font-size: clamp(30px, 11vw, 46px); }
+  .intro-skip { bottom: calc(18px + var(--safe-b)); }
+
+  .picker { padding: 16px; align-items: flex-start; overflow-y: auto; }
+  .picker-panel { margin: auto 0; }
+  .picker-head { margin-bottom: 14px; }
+  .picker-kicker { letter-spacing: 3px; }
+  .picker-card {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    grid-template-areas: "icon name" "icon desc" "icon stat";
+    column-gap: 12px;
+    row-gap: 2px;
+    padding: 14px 14px 14px 12px;
+  }
+  .picker-icon { grid-area: icon; font-size: 26px; align-self: center; }
+  .picker-name { grid-area: name; }
+  .picker-desc { grid-area: desc; font-size: 12px; }
+  .picker-stat { grid-area: stat; padding-top: 4px; }
+  .picker-badge { top: 10px; right: 10px; }
+
+  /* ---- App chrome ---- */
+  .app { padding-bottom: calc(var(--mnav-h) + var(--safe-b)); box-sizing: border-box; }
+
+  .topbar { padding: calc(8px + var(--safe-t)) 12px 8px; gap: 10px; }
+  .brand h1 { font-size: 15px; }
+  .topbar-stats { gap: 12px; }
+  .topbar-stats .tstat:nth-child(2) { display: none; }
+  .tstat-k { font-size: 8px; }
+  .tstat-v { font-size: 12px; max-width: 110px; }
+
+  /* Primary nav becomes a bottom tab bar */
+  .nav-links {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 2500;
+    height: calc(var(--mnav-h) + var(--safe-b));
+    padding: 0 6px var(--safe-b);
+    gap: 0;
+    background: var(--paper-panel);
+    border-top: 2px solid var(--ink);
+    justify-content: space-around;
+    align-items: stretch;
+    box-shadow: 0 -8px 22px -16px rgba(37, 31, 20, 0.45);
+  }
+  .nav-item { flex: 1; display: flex; }
+  .nav-link {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 4px;
+    font-size: 11px;
+    border-radius: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-link::before { font-size: 19px; line-height: 1; filter: grayscale(0.6); opacity: 0.75; }
+  .nav-link.active::before { filter: none; opacity: 1; }
+  #mode-launches-btn::before { content: '🚀'; }
+  #mode-tracker-btn::before  { content: '🛰'; }
+  #mode-mission-btn::before  { content: '📡'; }
+  .nav-link.active { box-shadow: inset 0 3px 0 currentColor; }
+
+  .nav-back-btn { left: 12px; bottom: calc(var(--mnav-h) + var(--safe-b) + 12px); }
+
+  .ticker-bar { padding: 5px 12px; }
+  .ticker-text { font-size: 12px; }
+  .tab-bar { padding: 8px 12px; gap: 6px; scrollbar-width: none; }
+  .tab-bar::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 6px 11px; font-size: 11px; }
+
+  /* ---- Satellites view: map on top, panels scroll below ---- */
+  .layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(260px, 46dvh) minmax(0, 1fr);
+  }
+  .splitter { display: none; }
+  .sidebar { border-left: none; border-top: 2px solid var(--ink); padding: 10px; gap: 10px; }
+  .sidebar .panel { height: auto !important; overflow-y: visible !important; }
+  .panel { padding: 12px; }
+
+  .leaflet-control-zoom { display: none; } /* pinch-zoom instead; frees the corner for the toolbar */
+  .map-toolbar { top: 8px; left: 8px; right: 8px; flex-wrap: wrap; justify-content: space-between; gap: 6px; }
+  .map-tools { gap: 4px; }
+  .map-tool-btn { padding: 5px 7px; font-size: 10px; }
+  .view-toggle-btn { padding: 5px 8px; font-size: 10px; }
+  .dome-controls { top: auto; bottom: 12px; right: 8px; flex-direction: row; }
+  .dome-ctrl-btn { width: 34px; }
+  .map-legend { left: 8px; bottom: 20px; max-width: 190px; padding: 8px 10px; }
+  .dome-object-list { left: 8px; bottom: 60px; max-width: 140px; max-height: 50%; overflow-y: auto; }
+  .dome-layers { transform: scale(calc(var(--dzoom, 1) * 0.78)) translateY(40px); }
+  .hemi-toggle { bottom: 10px; }
+
+  .panel.panel-fullscreen { inset: 0; border-radius: 0; padding-top: calc(12px + var(--safe-t)); }
+  .panel.panel-fullscreen .dg-grid { grid-template-columns: 1fr; }
+
+  /* ---- Launches view ---- */
+  .launches-view { padding: 10px; gap: 10px; scrollbar-gutter: auto; }
+  .launch-dome {
+    height: auto !important;
+    aspect-ratio: 620 / 680 !important;
+    max-height: 58dvh;
+    min-height: 240px;
+  }
+  .replay-controls { grid-template-columns: 1fr auto; gap: 8px; padding: 8px; }
+  .replay-transport { justify-content: space-between; grid-column: 1 / -1; }
+  .replay-btn { flex: 1; padding: 8px 4px; font-size: 12px; }
+  .replay-scrub { grid-column: 1 / -1; height: 28px; }
+  .stage-card { gap: 10px; padding: 8px 10px; }
+  .sc-art { flex-basis: 56px; }
+  .rp-art { width: 56px; height: 42px; }
+  .launches-map-hint { font-size: 11px; }
+  .lv-rail { width: auto; }
+  .launch-card { padding: 12px; gap: 10px; }
+  .launch-actions { flex-wrap: wrap; }
+  .launch-actions .flightpath-btn { flex: 1 1 auto; min-height: 38px; }
+  .launch-actions .flightpath-missing { order: 3; flex-basis: 100%; }
+
+  /* ---- Mission control ---- */
+  .mission-view { padding: 10px; }
+  .mc-grid { gap: 10px; grid-template-columns: minmax(0, 1fr) !important; }
+  .mc-grid > .panel, .lv-top > *, .launches-col { min-width: 0; }
+  .mission-view, .launches-view { overflow-x: hidden; }
+  .mission-view .panel { overflow-wrap: anywhere; }
+  .mc-cat-controls { flex-wrap: wrap; }
+  .mc-search { min-width: 0; flex: 1 1 100%; }
+  .mc-select { flex: 1 1 100%; }
+  .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  /* ---- Overlays ---- */
+  .drawer-panel {
+    width: 100vw;
+    border-left: none;
+    padding: calc(14px + var(--safe-t)) 14px calc(40px + var(--safe-b));
+  }
+  .media-modal { padding: 0 !important; }
+  .media-modal-panel { max-width: none; max-height: 100dvh; height: 100dvh; border-radius: 0; border: none; }
+  .media-nav { top: 30%; }
+}
+
+/* ==========================================================================
+   2. PHONES — landscape (short, touch)
+   ========================================================================== */
+@media (max-height: 500px) and (orientation: landscape) and (pointer: coarse) {
+  .ticker-bar { display: none; }
+  .topbar { padding: 6px 12px; }
+  .tab-bar { padding: 6px 12px; }
+  .layout { grid-template-columns: minmax(0, 1fr) 0 280px !important; }
+  .splitter { display: none; }
+  .sidebar .panel { height: auto !important; }
+  .launch-dome { height: auto !important; max-height: 82dvh; }
+  .lv-top { grid-template-columns: minmax(0, 1fr) 260px; }
+  .lv-rail { width: auto; }
+  .intro-content { transform: scale(0.85); }
+  .picker { align-items: flex-start; overflow-y: auto; }
+  .picker-options { grid-template-columns: repeat(3, 1fr) !important; }
+  .picker-desc { display: none; }
+}
+
+/* ==========================================================================
+   3. SQUARE screens (aspect ≈ 1:1) — tablets/displays from 641px up
+   A world map is 2:1, so stacking it full-width over the panels uses a
+   square screen far better than a tall narrow map beside a sidebar.
+   ========================================================================== */
+@media (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4) and (min-width: 641px) and (max-width: 1400px) {
+  .layout {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: minmax(0, 46dvh) minmax(0, 1fr);
+  }
+  .splitter { display: none; }
+  .sidebar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    border-left: none;
+    border-top: 2px solid var(--ink);
+  }
+  .sidebar > #detail-panel,
+  .sidebar > .credit { grid-column: 1 / -1; }
+  .sidebar .panel { height: auto !important; }
+
+  .lv-top { grid-template-columns: minmax(0, 1fr) minmax(240px, 34%); }
+  .lv-rail { width: auto; }
+  .launch-dome { height: auto !important; aspect-ratio: 620 / 680 !important; max-height: 64vh; }
+  .launches-lists { grid-template-columns: 1fr 1fr; }
+  .replay-controls { grid-template-columns: auto 1fr auto; }
+  .replay-scrub { grid-column: 1 / -1; grid-row: 2; }
+
+  .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mc-grid > .panel { min-width: 0; }
+
+  .picker-options { grid-template-columns: repeat(3, 1fr); }
+  .drawer-panel { width: min(560px, 70vw); }
+}
+
+/* Small square screens (≤ 640px, ≈1:1 — e.g. 480×480 displays, watches).
+   Phone rules above already apply; here we claw back vertical space. */
+@media (min-aspect-ratio: 4/5) and (max-aspect-ratio: 5/4) and (max-width: 640px) {
+  :root { --mnav-h: 48px; }
+  .ticker-bar { display: none; }
+  .topbar-stats .tstat:first-child { display: none; }
+  .nav-link { flex-direction: row; gap: 6px; font-size: 10px; }
+  .nav-link::before { font-size: 15px; }
+  .tab-bar { padding: 6px 10px; }
+  .layout { grid-template-rows: minmax(0, 42dvh) minmax(0, 1fr); }
+  .map-legend { display: none; }
+  .launch-dome { max-height: 50dvh; min-height: 0; }
+  .picker-desc { display: none; }
+  .intro-tagline, .intro-credit { display: none; }
+}
