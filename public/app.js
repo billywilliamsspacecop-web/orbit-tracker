@@ -192,9 +192,9 @@ function findSatByNoradId(noradId) {
 
 // ---------- Data loading ----------
 
-async function loadGroup(id) {
+async function loadGroup(id, refresh = false) {
   const bucket = state.groups.get(id);
-  const res = await fetch(`/api/gp?group=${encodeURIComponent(id)}`);
+  const res = await fetch(`/api/gp?group=${encodeURIComponent(id)}${refresh ? '&refresh=1' : ''}`);
   if (!res.ok) throw new Error(`Failed to load group ${id}`);
   const payload = await res.json();
   if (payload.error) throw new Error(payload.error);
@@ -220,6 +220,7 @@ async function loadGroup(id) {
 
   bucket.loaded = true;
   bucket.updated = payload.updated;
+  bucket.source = payload.source || 'CelesTrak';
 
   // Compute a real position (and heading) for every satellite BEFORE any
   // marker exists. Without this, markers are created at 0,0 and visibly
@@ -410,11 +411,9 @@ async function toggleTab(tabId) {
 
   if (needLoad.length) {
     setOverlay(true);
-    try {
-      await Promise.all(needLoad.map((g) => loadGroup(g.id)));
-    } catch (err) {
-      console.error(err);
-    }
+    // allSettled: one group failing must not keep the others off the map
+    const results = await Promise.allSettled(needLoad.map((g) => loadGroup(g.id)));
+    results.filter((r) => r.status === 'rejected').forEach((r) => console.error(r.reason));
     setOverlay(false);
   }
 
@@ -465,7 +464,8 @@ function updateMeta() {
   }
   const oldest = Math.min(...loadedBuckets.map((b) => b.updated));
   const mins = Math.max(0, Math.round((Date.now() - oldest) / 60000));
-  meta.textContent = `TLE data cached ${mins}m ago · source: CelesTrak`;
+  const sources = [...new Set(loadedBuckets.map((b) => b.source || 'CelesTrak'))].join(' + ');
+  meta.textContent = `TLE data cached ${mins}m ago · source: ${sources}`;
 }
 
 // ---------- Selection / detail panel ----------
@@ -871,7 +871,8 @@ document.getElementById('refresh-btn').addEventListener('click', async () => {
   setOverlay(true);
   try {
     const visibleGroups = GROUPS.filter((g) => isVisible(g.id));
-    await Promise.all(visibleGroups.map((g) => loadGroup(g.id)));
+    const results = await Promise.allSettled(visibleGroups.map((g) => loadGroup(g.id, true)));
+    results.filter((r) => r.status === 'rejected').forEach((r) => console.error(r.reason));
     updateCharts();
     updateOverview();
     updateMeta();
