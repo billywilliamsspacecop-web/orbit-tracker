@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#efe4cd" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="ORBITUS" />
+<title>ORBITUS 1.5 ALPHA — Live Satellite &amp; Launch Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="mobile.css" />
+</head>
+<body>
+
+  <!-- ============ INTRO / BOOT SCREEN ============ -->
+  <div class="intro" id="intro">
+    <div class="intro-photo" style="background-image:url('img/photos/saturn-launch.jpg')"></div>
+    <div class="intro-scrim"></div>
+    <div class="intro-content">
+      <div class="intro-kicker">General Catalogue &middot; Est. 1957</div>
+      <h1 class="intro-title">ORBITUS<span class="intro-title-accent">.ALPHA</span></h1>
+      <div class="intro-rule"></div>
+      <div class="intro-tagline">Live Satellite &amp; Launch Tracker</div>
+      <div class="intro-status" id="intro-status">Acquiring orbital elements…</div>
+      <div class="intro-progress"><div class="intro-progress-bar" id="intro-progress-bar"></div></div>
+    </div>
+    <div class="intro-credit">Apollo 11 liftoff, Kennedy Space Center — NASA, 1969</div>
+    <button class="intro-skip" id="intro-skip">Skip →</button>
+  </div>
+
+  <!-- ============ VIEW PICKER ============ -->
+  <div class="picker" id="picker" hidden>
+    <div class="picker-backdrop"></div>
+    <div class="picker-panel">
+      <div class="picker-head">
+        <div class="picker-kicker">SELECT VIEW</div>
+        <div class="picker-title">Where do you want to start?</div>
+      </div>
+      <div class="picker-options">
+        <button class="picker-card featured" data-view="launches">
+          <span class="picker-badge">START HERE</span>
+          <span class="picker-icon">🚀</span>
+          <span class="picker-name">Launches</span>
+          <span class="picker-desc">Fly real mission timelines — ascent, stage separation, entry burn and booster touchdown.</span>
+          <span class="picker-stat" id="picker-stat-launches">—</span>
+        </button>
+        <button class="picker-card" data-view="tracker">
+          <span class="picker-icon">🛰</span>
+          <span class="picker-name">Satellites</span>
+          <span class="picker-desc">Live orbital map, telemetry, ground tracks, generated diagrams and the 2.5D dome.</span>
+          <span class="picker-stat" id="picker-stat-sats">—</span>
+        </button>
+        <button class="picker-card" data-view="mission">
+          <span class="picker-icon">📡</span>
+          <span class="picker-name">Mission Control</span>
+          <span class="picker-desc">Everything at once — counts, countdown, weather, charts and live activity.</span>
+          <span class="picker-stat" id="picker-stat-mission">Dashboard</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div class="app" id="app" hidden>
+
+  <button class="nav-back-btn" id="nav-back-btn" hidden>
+    <span class="nav-back-arrow">←</span>
+    <span>Back to <span id="nav-back-label">—</span></span>
+    <span class="nav-back-dismiss" id="nav-back-dismiss" title="Dismiss">✕</span>
+  </button>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 100 100" class="brand-orbit">
+          <ellipse class="orbit-ring" cx="50" cy="50" rx="40" ry="16"></ellipse>
+          <ellipse class="orbit-ring" cx="50" cy="50" rx="40" ry="16" transform="rotate(60 50 50)"></ellipse>
+          <ellipse class="orbit-ring" cx="50" cy="50" rx="40" ry="16" transform="rotate(120 50 50)"></ellipse>
+          <circle class="orbit-core" cx="50" cy="50" r="8"></circle>
+        </svg>
+      </span>
+      <h1>ORBITUS<span class="ver">.ALPHA</span></h1>
+    </div>
+
+    <nav class="nav-links" id="mode-bar">
+      <div class="nav-item">
+        <button class="nav-link active" id="mode-launches-btn">Launches</button>
+        <div class="nav-dropdown">
+          <div class="nav-dropdown-desc">Fly real mission timelines — ascent, stage separation, entry burn and booster touchdown.</div>
+          <a href="#" class="nav-dropdown-link" id="nav-link-upcoming">Upcoming launches</a>
+          <a href="#" class="nav-dropdown-link" id="nav-link-recent">Recently flown</a>
+        </div>
+      </div>
+      <div class="nav-item">
+        <button class="nav-link" id="mode-tracker-btn">Satellites</button>
+        <div class="nav-dropdown">
+          <div class="nav-dropdown-desc">Live orbital map, telemetry, ground tracks, generated diagrams and the 2.5D dome.</div>
+          <a href="#" class="nav-dropdown-link" id="nav-link-map">Map view</a>
+          <a href="#" class="nav-dropdown-link" id="nav-link-dome">Dome view</a>
+          <a href="#" class="nav-dropdown-link" id="nav-link-horizon">Horizon view</a>
+          <a href="#" class="nav-dropdown-link" id="nav-link-legend">Icon legend</a>
+        </div>
+      </div>
+      <div class="nav-item">
+        <button class="nav-link" id="mode-mission-btn">Mission Control</button>
+        <div class="nav-dropdown">
+          <div class="nav-dropdown-desc">Everything at once — counts, countdown, weather, charts and live activity.</div>
+          <a href="#" class="nav-dropdown-link" id="nav-link-schedule">Upcoming schedule</a>
+          <a href="#" class="nav-dropdown-link" id="nav-link-catalogue">Object catalogue</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="topbar-stats">
+      <span class="tstat"><span class="tstat-k">TRACKED</span><span class="tstat-v" id="hud-tracked">—</span></span>
+      <span class="tstat"><span class="tstat-k">NEXT LAUNCH</span><span class="tstat-v" id="hud-next">—</span></span>
+      <span class="tstat"><span class="tstat-k">UTC</span><span class="tstat-v" id="clock">--:--:--</span></span>
+    </div>
+  </header>
+
+  <div class="ticker-bar">
+    <span class="ticker-label">FEED</span>
+    <div class="ticker-track">
+      <span class="ticker-text" id="ticker-text">Initializing feed…</span>
+    </div>
+  </div>
+
+  <nav class="tab-bar" id="tab-bar"></nav>
+
+  <!-- ============ TRACKER VIEW ============ -->
+  <main class="layout" id="tracker-view" hidden>
+    <section class="map-wrap">
+      <div id="map"></div>
+      <div id="dome-view" class="dome-stage" hidden></div>
+      <div id="horizon-view" class="horizon-stage" hidden>
+        <div id="sat-horizon" class="sat-horizon"></div>
+        <div class="hemi-toggle">
+          <button class="view-toggle-btn active" id="hemi-west">◀ WEST</button>
+          <button class="view-toggle-btn" id="hemi-east">EAST ▶</button>
+        </div>
+      </div>
+
+      <div class="map-toolbar">
+        <div class="map-tools" id="map-tools">
+          <button class="map-tool-btn active" id="labels-toggle" title="Toggle English / local place names">🌐 EN</button>
+          <button class="map-tool-btn" id="clouds-toggle" title="Toggle live cloud cover layer">☁ CLOUDS</button>
+          <button class="map-tool-btn" id="legend-toggle" title="Toggle icon legend">▤ LEGEND</button>
+        </div>
+
+        <div class="view-toggle">
+          <button class="view-toggle-btn active" id="view-map-btn">MAP</button>
+          <button class="view-toggle-btn" id="view-dome-btn">DOME</button>
+          <button class="view-toggle-btn" id="view-horizon-btn">HORIZON</button>
+        </div>
+      </div>
+
+      <div class="dome-controls" id="dome-controls" hidden>
+        <button class="dome-ctrl-btn" id="dome-zoom-in" title="Zoom in">🔍+</button>
+        <button class="dome-ctrl-btn" id="dome-zoom-out" title="Zoom out">🔍−</button>
+        <button class="dome-ctrl-btn" id="dome-tilt-up" title="Tilt up">▲</button>
+        <button class="dome-ctrl-btn" id="dome-tilt-down" title="Tilt down">▼</button>
+        <button class="dome-ctrl-btn" id="dome-reset" title="Reset view">⟲</button>
+      </div>
+
+      <div class="dome-object-list" id="dome-object-list" hidden></div>
+
+      <div class="map-legend" id="map-legend">
+        <div class="legend-title">ICON SCALE</div>
+        <div class="legend-row"><span class="legend-swatch lg-xl"></span><span>Space station · very large</span></div>
+        <div class="legend-row"><span class="legend-swatch lg-lg"></span><span>Telescope / GEO comsat</span></div>
+        <div class="legend-row"><span class="legend-swatch lg-md"></span><span>Weather / science / GPS</span></div>
+        <div class="legend-row"><span class="legend-swatch lg-sm"></span><span>Smallsat / Starlink</span></div>
+        <div class="legend-note">Icons point along the direction of travel. Size is by class, not to scale.</div>
+      </div>
+
+      <div class="map-overlay" id="loading-overlay">ACQUIRING ORBITAL DATA…</div>
+    </section>
+
+    <div class="splitter" id="splitter" title="Drag to resize"><span class="splitter-grip"></span></div>
+
+    <aside class="sidebar" id="sidebar">
+
+      <div class="panel">
+        <h2>Section</h2>
+        <div class="overview-row"><span>Showing</span><strong id="ov-label">All</strong></div>
+        <div class="overview-row"><span>Tracked</span><strong id="ov-count">0</strong></div>
+        <button id="refresh-btn" class="refresh-btn">↻ Refresh TLE data</button>
+        <div class="meta" id="data-meta">—</div>
+      </div>
+
+      <div class="panel accent-magenta resizable" id="detail-panel">
+        <h2>Selected satellite
+          <button class="panel-expand" id="detail-expand" title="Expand to full screen">⤢</button>
+        </h2>
+        <div class="detail-empty" id="detail-empty">Click a satellite on the map to see live details.</div>
+        <div class="detail-body" id="detail-body" hidden>
+          <div class="media-tabs">
+            <button class="media-tab active" data-media="image">🖼 Photos</button>
+            <button class="media-tab" data-media="video">▶ Videos</button>
+          </div>
+          <div id="sat-schematic" class="schematic-wrap"></div>
+
+          <div class="detail-name" id="d-name">—</div>
+          <div class="detail-grid">
+            <div><span>NORAD ID</span><strong id="d-norad">—</strong></div>
+            <div><span>Latitude</span><strong id="d-lat">—</strong></div>
+            <div><span>Longitude</span><strong id="d-lon">—</strong></div>
+            <div><span>Altitude</span><strong id="d-alt">—</strong></div>
+            <div><span>Velocity</span><strong id="d-vel">—</strong></div>
+            <div><span>Period</span><strong id="d-period">—</strong></div>
+            <div><span>Launched</span><strong id="d-launched">—</strong></div>
+            <div><span>Heading</span><strong id="d-heading">—</strong></div>
+          </div>
+
+          <div class="subtab-bar">
+            <button class="subtab-btn active" data-subtab="telemetry">Telemetry</button>
+            <button class="subtab-btn" data-subtab="trajectory">Trajectory</button>
+            <button class="subtab-btn" data-subtab="diagrams">Diagrams</button>
+          </div>
+
+          <div class="subtab-content" id="subtab-diagrams">
+            <div id="sat-diagrams"><div class="detail-empty">Select a satellite to generate its diagrams.</div></div>
+          </div>
+
+          <div class="subtab-content active" id="subtab-telemetry">
+            <div class="detail-grid">
+              <div><span>Inclination</span><strong id="t-incl">—</strong></div>
+              <div><span>Eccentricity</span><strong id="t-ecc">—</strong></div>
+              <div><span>Apogee</span><strong id="t-apogee">—</strong></div>
+              <div><span>Perigee</span><strong id="t-perigee">—</strong></div>
+              <div><span>Mean motion</span><strong id="t-meanmotion">—</strong></div>
+              <div><span>TLE epoch</span><strong id="t-epoch">—</strong></div>
+              <div><span>Int'l designator</span><strong id="t-designator">—</strong></div>
+              <div><span>Launch year</span><strong id="t-launchyear">—</strong></div>
+            </div>
+          </div>
+
+          <div class="subtab-content" id="subtab-trajectory">
+            <div class="overview-row"><span>Heading</span><strong id="tr-heading">—</strong></div>
+            <div class="overview-row"><span>Orbit / day</span><strong id="tr-revday">—</strong></div>
+            <button id="track-toggle-btn" class="refresh-btn">Show ground track</button>
+            <div class="meta">Plots one full orbit (half past, half future) using SGP4 — not a live feed, recomputed each refresh.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel accent-green" id="composition-panel">
+        <h2>Composition</h2>
+        <div class="detail-empty" id="composition-single-note" hidden>Only one group is shown, so there's nothing to compare it against. Turn more groups back on above to see the breakdown.</div>
+        <canvas id="pie-chart" height="200"></canvas>
+      </div>
+
+      <div class="panel blueprint-panel">
+        <h2>Orbital shells (blueprint)</h2>
+        <div id="cross-section" class="cross-section-wrap"></div>
+        <div class="meta">Schematic — satellites are spaced evenly per shell for readability, not plotted at real-time position.</div>
+      </div>
+
+      <div class="panel accent-amber">
+        <h2>Altitude distribution</h2>
+        <canvas id="bar-chart" height="200"></canvas>
+      </div>
+
+      <div class="panel credit">
+        Orbital data: <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a> ·
+        Propagation: <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a> (SGP4) ·
+        Launches: <a href="https://thespacedevs.com" target="_blank" rel="noopener">The Space Devs</a> ·
+        Media: <a href="https://images.nasa.gov" target="_blank" rel="noopener">NASA</a> ·
+        Weather: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ============ LAUNCHES VIEW ============ -->
+  <main class="launches-view" id="launches-view">
+
+    <div class="lv-top">
+      <div class="launch-dome-wrap">
+        <div id="launch-dome" class="launch-dome"></div>
+        <div class="launch-dome-resize-handle" id="launch-dome-resize-handle" title="Drag to resize · double-click to reset"></div>
+        <div class="dome-loading" id="dome-loading" hidden><span class="btn-spinner"></span>Loading mission timeline…</div>
+
+        <!-- Always present so showing a replay never reflows the page -->
+        <div class="replay-controls" id="replay-controls">
+          <div class="replay-transport">
+            <button class="replay-btn ghost" id="replay-restart" title="Restart (R)">⏮</button>
+            <button class="replay-btn ghost" id="replay-prev" title="Previous event (←)">⏪</button>
+            <button class="replay-btn ghost" id="replay-back10" title="Back 10s">−10s</button>
+            <button class="replay-btn primary" id="replay-play" title="Play / pause (Space)">▶</button>
+            <button class="replay-btn ghost" id="replay-fwd10" title="Forward 10s">+10s</button>
+            <button class="replay-btn ghost" id="replay-next" title="Next event (→)">⏩</button>
+          </div>
+          <div class="replay-clockwrap">
+            <span class="replay-clock" id="replay-clock">T−00:30</span>
+            <span class="replay-local" id="replay-local"></span>
+          </div>
+          <input type="range" class="replay-scrub" id="replay-scrub" min="-60" max="600" value="-60" step="1" />
+          <select class="replay-speed" id="replay-speed" title="Playback speed">
+            <option value="0.5">0.5×</option>
+            <option value="1">1×</option>
+            <option value="2">2×</option>
+            <option value="4">4×</option>
+            <option value="8" selected>8×</option>
+            <option value="20">20×</option>
+            <option value="60">60×</option>
+            <option value="150">150×</option>
+          </select>
+        </div>
+
+        <div class="stage-card" id="stage-card">
+          <div class="detail-empty">Pick a launch below to fly its mission timeline.</div>
+        </div>
+
+        <div class="replay-timeline" id="replay-timeline"></div>
+
+        <div class="launches-map-hint">
+          Event names, T+ times, landing zone and downrange distance are real published mission data.
+          The curves between those points are illustrative — continuous ascent telemetry isn't public.
+        </div>
+      </div>
+
+      <aside class="lv-rail">
+        <div class="panel accent-magenta">
+          <h2>Mission brief</h2>
+          <div id="mission-brief"><div class="detail-empty">Select a launch to see its full brief here.</div></div>
+        </div>
+        <div class="panel">
+          <h2>Next up</h2>
+          <div id="rail-next" class="rail-list"><div class="detail-empty">Loading…</div></div>
+        </div>
+        <div class="panel accent-green">
+          <h2>Just flown</h2>
+          <div id="rail-recent" class="rail-list"><div class="detail-empty">Loading…</div></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="launches-lists">
+      <div class="launches-col">
+        <h2 class="launches-heading">Upcoming</h2>
+        <div class="launch-list" id="launches-upcoming"><div class="detail-empty">Loading…</div></div>
+      </div>
+      <div class="launches-col">
+        <h2 class="launches-heading">Recent</h2>
+        <div class="launch-list" id="launches-recent"><div class="detail-empty">Loading…</div></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ MISSION CONTROL VIEW ============ -->
+  <main class="mission-view" id="mission-view" hidden>
+    <div class="mc-grid">
+
+      <div class="panel mc-hero accent-magenta">
+        <h2>Next launch</h2>
+        <div id="mc-next-launch"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+      <div class="panel mc-kpis">
+        <h2>Live counts</h2>
+        <div class="kpi-row" id="mc-kpis"></div>
+      </div>
+
+      <div class="panel accent-green">
+        <h2>Pad weather</h2>
+        <div id="mc-weather"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+      <div class="panel accent-amber">
+        <h2>Orbit distribution</h2>
+        <canvas id="mc-orbit-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Objects by group</h2>
+        <canvas id="mc-group-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel accent-purple">
+        <h2>Launch cadence · recent providers</h2>
+        <canvas id="mc-cadence-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel mc-wide">
+        <h2>Upcoming schedule</h2>
+        <div id="mc-schedule"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+      <div class="panel mc-wide accent-green">
+        <h2>Highest &amp; fastest right now</h2>
+        <div id="mc-extremes"><div class="detail-empty">Waiting for propagation…</div></div>
+      </div>
+
+      <div class="panel">
+        <h2>Launch sites</h2>
+        <div id="mc-sites"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+      <div class="panel accent-magenta">
+        <h2>Countries &amp; agencies</h2>
+        <div id="mc-countries"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+      <div class="panel accent-amber">
+        <h2>Mission types</h2>
+        <canvas id="mc-missiontype-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel mc-wide accent-purple">
+        <h2>Orbit glossary</h2>
+        <div id="mc-glossary"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Inclination spread</h2>
+        <canvas id="mc-incl-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel accent-green">
+        <h2>Launch decade</h2>
+        <canvas id="mc-decade-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel accent-magenta">
+        <h2>Orbital period spread</h2>
+        <canvas id="mc-period-chart" height="190"></canvas>
+      </div>
+
+      <div class="panel mc-wide">
+        <h2>Object catalogue <span class="mc-sub">click any row to select it on the map</span></h2>
+        <div class="mc-cat-controls">
+          <input type="search" id="mc-cat-search" class="mc-search" placeholder="Search by name or NORAD ID…" />
+          <select id="mc-cat-sort" class="mc-select">
+            <option value="alt-desc">Altitude ↓</option>
+            <option value="alt-asc">Altitude ↑</option>
+            <option value="name">Name A–Z</option>
+            <option value="incl-desc">Inclination ↓</option>
+            <option value="period-asc">Period ↑</option>
+            <option value="launch-desc">Launch year ↓</option>
+          </select>
+        </div>
+        <div id="mc-catalogue"><div class="detail-empty">Waiting for propagation…</div></div>
+      </div>
+
+      <div class="panel mc-wide accent-amber">
+        <h2>Recent activity feed</h2>
+        <div id="mc-activity"><div class="detail-empty">Loading…</div></div>
+      </div>
+
+    </div>
+  </main>
+
+  </div><!-- /.app -->
+
+  <!-- ============ LAUNCH DETAIL DRAWER ============ -->
+  <div class="drawer" id="launch-drawer" hidden>
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="ld-name">
+      <button class="drawer-close" id="drawer-close" aria-label="Close">✕</button>
+      <div class="drawer-body" id="launch-drawer-body"></div>
+    </aside>
+  </div>
+
+  <!-- ============ MEDIA LIGHTBOX ============ -->
+  <div class="media-modal" id="media-modal" hidden>
+    <div class="media-modal-backdrop" id="media-modal-backdrop"></div>
+    <div class="media-modal-panel" role="dialog" aria-modal="true" aria-labelledby="mm-title">
+      <button class="media-modal-close" id="media-modal-close" aria-label="Close">✕</button>
+      <button class="media-nav media-prev" id="mm-prev" aria-label="Previous">‹</button>
+      <button class="media-nav media-next" id="mm-next" aria-label="Next">›</button>
+      <div class="media-modal-imgwrap" id="mm-stage">
+        <img id="mm-img" src="" alt="" />
+        <video id="mm-video" controls preload="metadata" hidden playsinline></video>
+      </div>
+      <div class="media-modal-info">
+        <div class="media-modal-ref-badge" id="mm-ref-badge" hidden>REFERENCE PHOTO — same type/model, not this exact unit</div>
+        <div class="media-modal-title" id="mm-title">—</div>
+        <div class="media-modal-desc" id="mm-desc"></div>
+        <div class="media-modal-credit" id="mm-credit"></div>
+      </div>
+    </div>
+  </div>
+
+<script src="static-api.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="geo.js"></script>
+<script src="app.js"></script>
+<script src="diagrams.js"></script>
+<script src="blueprint.js"></script>
+<script src="weather.js"></script>
+<script src="replay.js"></script>
+<script src="launches.js"></script>
+<script src="mission.js"></script>
+<script src="resize.js"></script>
+<script src="boot.js"></script>
+<script src="mobile.js"></script>
+<script>
+  // Bootstrap after every file has finished loading & defining its functions.
+  initModeToggle();
+  initMediaModal();
+  initMapTools();
+  initDomeInteraction();
+  initLaunchDrawer();
+  initReplayControls();
+  initResizers();
+  initNavDropdowns();
+  initBackButton();
+  bootSequence();
+</script>
+</body>
+</html>

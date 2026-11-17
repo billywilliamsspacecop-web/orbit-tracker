@@ -1,0 +1,11 @@
+{
+  "name": "orbit-tracker",
+  "version": "1.0.0",
+  "description": "Live low-orbit satellite tracker \u2014 public CelesTrak TLE data visualized on a map with composition and altitude charts.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "deploy": "git push origin `git subtree split --prefix public main`:refs/heads/gh-pages --force"
+  },
+  "license": "MIT"
+}

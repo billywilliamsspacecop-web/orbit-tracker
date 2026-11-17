@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+# Local-only material (personal reference images, session notes, tool config)
+StyleRef/
+CONTEXT.md
+.claude/
