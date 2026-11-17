@@ -30,7 +30,11 @@
   // ---------- cache (memory + localStorage, both best-effort) ----------
 
   const mem = new Map();
-  const LS_PREFIX = 'orbitus-api:';
+  // Drop entries written by the first version of this file (different shape)
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('orbitus-api:')).forEach((k) => localStorage.removeItem(k));
+  } catch (e) { /* storage unavailable */ }
+  const LS_PREFIX = 'orbitus-api2:'; // v2: gp entries now carry their source
 
   // Returns a fresh entry, or with `allowStale` any entry at all — used as a
   // fallback when the upstream refuses (CelesTrak 403s repeat downloads).
@@ -87,6 +91,54 @@
 
   function httpsify(url) {
     return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : url;
+  }
+
+  // ---------- Fallback TLE source ----------
+  // CelesTrak 403s an IP that re-downloads the same group too often, which
+  // left the map empty. tle.ivanstanojevic.me re-publishes CelesTrak's
+  // elements (CORS-enabled, searchable by name), so each group is rebuilt
+  // from a handful of name searches. Only elements from the last 30 days are
+  // kept — the API also holds long-dead objects with ancient TLEs.
+
+  const FALLBACK_SEARCHES = {
+    stations: ['ISS (ZARYA)', 'CSS (TIANHE)', 'CSS (WENTIAN)', 'CSS (MENGTIAN)', 'DRAGON', 'SOYUZ-MS', 'PROGRESS-MS', 'SHENZHOU', 'TIANZHOU', 'CYGNUS'],
+    'gps-ops': ['GPS B', 'GPS III', 'NAVSTAR'],
+    weather: ['NOAA', 'GOES', 'METEOSAT', 'METOP', 'METEOR-M', 'FENGYUN', 'HIMAWARI', 'SUOMI NPP', 'DMSP'],
+    starlink: ['STARLINK'],
+    science: ['HST', 'SWIFT', 'FERMI', 'NUSTAR', 'TESS', 'AQUA', 'TERRA', 'LANDSAT', 'SENTINEL', 'ICESAT', 'GRACE', 'AURA', 'SMAP', 'CALIPSO', 'JASON', 'SWOT', 'HINODE'],
+    geo: ['INTELSAT', 'SES-', 'EUTELSAT', 'ASTRA', 'TDRS', 'INMARSAT', 'SIRIUS', 'VIASAT', 'ECHOSTAR', 'DIRECTV', 'ARABSAT', 'TURKSAT', 'APSTAR', 'CHINASAT'],
+  };
+  const FALLBACK_MAX_AGE_MS = 30 * 24 * 60 * MIN;
+
+  async function fallbackSearch(term, pages) {
+    const out = [];
+    for (let page = 1; page <= pages; page++) {
+      const url = `https://tle.ivanstanojevic.me/api/tle/?search=${encodeURIComponent(term)}&page-size=100&page=${page}&sort=popularity&sort-dir=desc`;
+      const data = await getJSON(url);
+      const members = data.member || [];
+      out.push(...members);
+      if (members.length < 100) break;
+    }
+    return out;
+  }
+
+  async function fallbackGroupTLE(group) {
+    const terms = FALLBACK_SEARCHES[group] || [];
+    const pages = group === 'starlink' ? 3 : 1;
+    const results = await Promise.allSettled(terms.map((t) => fallbackSearch(t, pages)));
+    const seen = new Set();
+    const lines = [];
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      for (const m of r.value) {
+        if (!m.line1 || !m.line2 || seen.has(m.satelliteId)) continue;
+        if (Date.now() - Date.parse(m.date) > FALLBACK_MAX_AGE_MS) continue;
+        seen.add(m.satelliteId);
+        lines.push(m.name, m.line1, m.line2);
+      }
+    }
+    if (!lines.length) throw new Error('Fallback TLE source returned nothing');
+    return lines.join('\n');
   }
 
   // ---------- transforms (mirrors server.js) ----------
@@ -317,9 +369,27 @@
     async '/api/gp'(p) {
       const group = p.get('group') || 'stations';
       if (!ALLOWED_GROUPS.has(group)) return [400, { error: `Unknown group "${group}"` }];
-      const { time, value } = await cached(`gp:${group}`, TTL.gp, () =>
-        getText(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=tle`));
-      return [200, { group, updated: time, tle: value }];
+      const key = `gp:${group}`;
+      if (p.get('refresh') !== '1') {
+        const hit = cacheGet(key, TTL.gp);
+        if (hit) return [200, { group, updated: hit.time, tle: hit.value.tle, source: hit.value.source }];
+      }
+      let value;
+      try {
+        const tle = await getText(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=tle`);
+        if (!/^1 \d/m.test(tle)) throw new Error('CelesTrak returned no elements');
+        value = { tle, source: 'CelesTrak' };
+      } catch (err) {
+        try {
+          value = { tle: await fallbackGroupTLE(group), source: 'CelesTrak via tle.ivanstanojevic.me' };
+        } catch (err2) {
+          const stale = cacheGet(key, TTL.gp, true);
+          if (stale) return [200, { group, updated: stale.time, tle: stale.value.tle, source: stale.value.source }];
+          throw err;
+        }
+      }
+      const entry = cacheSet(key, value);
+      return [200, { group, updated: entry.time, tle: value.tle, source: value.source }];
     },
 
     async '/api/launches'(p) {
